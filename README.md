@@ -6,11 +6,13 @@ Used mainly to organize "Company" structures within delivc services.
 
 Team exposes the following endpoints:
 
+**All endpoints except Health requires Authentication with the [@delivc/identity](https://github.com/delivc/identity) service**
+
 * **GET /health**
 
   Returns the publicly available healthcheck for this service.
 
-  All endpoints except Health requires Authentication with the [@delivc/identity](https://github.com/delivc/identity) service
+
 
   ```json
   {
