@@ -195,3 +195,12 @@ Team exposes the following endpoints:
         ]
     }
     ```
+
+* **DELETE /accounts/{id}**
+  
+  Delete given Account. User MUST be SuperAdmin or Owner of given Account
+
+  Returns
+  ```json
+  {}
+  ```
