@@ -7,7 +7,7 @@ import (
 	"github.com/delivc/identity/models"
 	"github.com/delivc/team/storage"
 	"github.com/delivc/team/storage/namespace"
-	"github.com/gobuffalo/pop"
+	"github.com/gobuffalo/pop/v5"
 	"github.com/gofrs/uuid"
 	"github.com/pkg/errors"
 )
