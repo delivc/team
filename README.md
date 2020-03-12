@@ -345,12 +345,12 @@ Team exposes the following endpoints:
     }
   ```
 
-  * **GET /accounts/{id}/role/{roleID}**
+* **GET /accounts/{id}/role/{roleID}**
 
   Returns given Role by ID if exists
 
   ```json
-        {
+    {
         "id": "9e5ba411-364b-4757-ad9f-890b87eeb157",
         "name": "Admin",
         "createdAt": "2020-03-11T08:57:33Z",
