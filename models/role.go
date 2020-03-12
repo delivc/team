@@ -1,6 +1,7 @@
 package models
 
 import (
+	"database/sql"
 	"time"
 
 	"github.com/delivc/team/storage"
@@ -11,7 +12,7 @@ import (
 
 // Role reflects a given Role within an Account
 type Role struct {
-	AccountID   uuid.UUID   `json:"account_id" db:"account_id"`
+	AccountID   uuid.UUID   `json:"-" db:"account_id"`
 	ID          uuid.UUID   `json:"id" db:"id"`
 	Name        string      `json:"name" db:"name"`
 	CreatedAt   time.Time   `json:"createdAt" db:"created_at"`
@@ -70,5 +71,20 @@ func NewRole(accountID uuid.UUID, name string) (*Role, error) {
 // The relationship between the User and Account MUST exists when calling this
 func AttachRole(tx *storage.Connection, accountID uuid.UUID, userID uuid.UUID, roleID uuid.UUID) error {
 	return nil
+}
 
+func findRoles(tx *storage.Connection, query string, args ...interface{}) ([]*Role, error) {
+	obj := []*Role{}
+	if err := tx.Q().Eager().Where(query, args...).All(&obj); err != nil {
+		if errors.Cause(err) == sql.ErrNoRows {
+			return nil, RoleNotFoundError{}
+		}
+		return nil, errors.Wrap(err, "error finding roles")
+	}
+	return obj, nil
+}
+
+// FindRolesByAccount returns a list of roles by account or error
+func FindRolesByAccount(tx *storage.Connection, id uuid.UUID) ([]*Role, error) {
+	return findRoles(tx, "account_id = ?", id)
 }

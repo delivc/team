@@ -15,11 +15,17 @@ Team exposes the following endpoints:
 
 
   ```json
-  {
-    "description": "Team is a management Service for Delivc Teams",
-    "name": "Team",
-    "version": "dev"
-  }
+    {
+        "alloc": "1 MiB",
+        "cached_items": "1",
+        "description": "Team is a management Service for Delivc Teams",
+        "garbage_collector_runs": "3",
+        "name": "Team",
+        "start_time": "2020-03-12 04:50:07.786883 +0100 CET m=+0.005006555",
+        "sys": "68 MiB",
+        "total_alloc": "5 MiB",
+        "version": "dev"
+    }
   ```
 
 * **GET /accounts**
@@ -50,6 +56,85 @@ Team exposes the following endpoints:
             }
         ],
         "aud": "app.delivc.com"
+    }
+  ```
+
+* **GET /accounts/{id}**
+
+    Returns:
+    ```json
+    {
+        "id": "263aa240-8bb1-4f27-8926-a14b16e69936",
+        "aud": "app.delivc.com",
+        "name": "Awesome Team",
+        "owner_ids": {
+            "0": "1dffa867-718b-4488-b07e-f838ef7b01e4"
+        },
+        "createdAt": "2020-03-11T08:57:33Z",
+        "updatedAt": "2020-03-11T08:57:33Z",
+        "roles": [
+            {
+                "id": "9e5ba411-364b-4757-ad9f-890b87eeb157",
+                "name": "Admin",
+                "createdAt": "2020-03-11T08:57:33Z",
+                "updatedAt": "2020-03-11T08:57:33Z"
+            }
+        ],
+        "users": [
+            {
+                "user_id": "1dffa867-718b-4488-b07e-f838ef7b01e4",
+                "role_id": "9e5ba411-364b-4757-ad9f-890b87eeb157",
+                "invited_by": "00000000-0000-0000-0000-000000000000"
+            }
+        ]
+    }
+    ```
+
+* **PUT /accounts/{id}**
+
+  Updates the given Account. Only the Fields are getting updated from request
+
+  This Requests needs one of the following Permissions
+  * `account-edit`
+  * `isOwner`
+  * `isSuperAdmin`
+
+  ```json
+    {
+        "name": "Awesome Team Updated",
+        "billing_name": "Delivc GmbH",
+        "billing_email": "me@julian.pro"
+    }
+  ```
+
+  Returns:
+  ```json
+    {
+        "id": "263aa240-8bb1-4f27-8926-a14b16e69936",
+        "aud": "app.delivc.com",
+        "name": "Awesome Team Updated",
+        "billing_name": "Delivc GmbH",
+        "billing_email": "me@julian.pro",
+        "owner_ids": {
+            "0": "1dffa867-718b-4488-b07e-f838ef7b01e4"
+        },
+        "createdAt": "2020-03-11T08:57:33Z",
+        "updatedAt": "2020-03-12T06:17:47.072033+01:00",
+        "roles": [
+            {
+                "id": "9e5ba411-364b-4757-ad9f-890b87eeb157",
+                "name": "Admin",
+                "createdAt": "2020-03-11T08:57:33Z",
+                "updatedAt": "2020-03-11T08:57:33Z"
+            }
+        ],
+        "users": [
+            {
+                "user_id": "1dffa867-718b-4488-b07e-f838ef7b01e4",
+                "role_id": "9e5ba411-364b-4757-ad9f-890b87eeb157",
+                "invited_by": "00000000-0000-0000-0000-000000000000"
+            }
+        ]
     }
   ```
 

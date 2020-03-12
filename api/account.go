@@ -7,9 +7,7 @@ import (
 	"github.com/delivc/team/models"
 	"github.com/delivc/team/storage"
 	"github.com/go-chi/chi/v4"
-	"github.com/gobuffalo/pop/v5"
 	"github.com/gofrs/uuid"
-	"github.com/pkg/errors"
 )
 
 // accountCreateParams
@@ -32,8 +30,6 @@ func (a *API) AccountCreate(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	params.Aud = a.requestAud(ctx, r)
-
-	pop.Debug = true
 
 	var account *models.Account
 
@@ -88,6 +84,10 @@ func (a *API) AccountCreate(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	// we can cache this on creation
+	// "users" will not exists, but it will get updated
+	// with the next "update" until then, data is fine.
+	a.cache.SetDefault("account-"+account.ID.String(), account)
 	return sendJSON(w, http.StatusOK, account)
 }
 
@@ -136,6 +136,10 @@ func (a *API) AccountDelete(w http.ResponseWriter, r *http.Request) error {
 
 // AccountsGet returns a list of all related accounts
 func (a *API) AccountsGet(w http.ResponseWriter, r *http.Request) error {
+	// what is our caching key?
+	// what are we receiving?
+	// nothing ;s we can just save on a user base ;O
+	// [accounts-userid?]
 	ctx := r.Context()
 	aud := a.requestAud(ctx, r)
 	user := getUser(ctx)
@@ -168,17 +172,161 @@ func (a *API) AccountsGet(w http.ResponseWriter, r *http.Request) error {
 
 // AccountGet gets an Account from the Database if exists
 // or returns nil
+// single requests are cached!
 func (a *API) AccountGet(w http.ResponseWriter, r *http.Request) error {
-	id, err := uuid.NewV4()
+	var accountID uuid.UUID
+	var account *models.Account
+	var err error
+
+	ctx := r.Context()
+	user := getUser(ctx)
+
+	accountID, err = uuid.FromString(chi.URLParam(r, "id"))
 	if err != nil {
-		return errors.Wrap(err, "Error generating unique id")
+		return badRequestError("Invalid Account ID")
 	}
-	account, err := models.FindAccountByID(a.db, id)
+
+	fromCache, exists := a.cache.Get("account-" + accountID.String())
+	if exists {
+		var ok bool
+		account, ok = fromCache.(*models.Account)
+		if ok {
+			// do we have permission to view this entity
+			if user.IsSuperAdmin || account.IsOwner(user.ID) || account.IsMember(user.ID) {
+				// we are just reading, this is a default permission
+				// so simple is this.
+				return sendJSON(w, http.StatusOK, account)
+			}
+			// usually we would throw an 401
+			// but this would give attackers an idea about the existence of this
+			// account
+
+			return notFoundError("Account not found")
+		}
+	}
+
+	account, err = models.FindAccountByID(a.db, accountID)
 	if err != nil {
 		if models.IsNotFoundError(err) {
 			return notFoundError(err.Error())
 		}
-		return internalServerError("Database error finding user").WithInternalError(err)
+		return internalServerError("Database error finding account").WithInternalError(err)
 	}
+
+	// cache it
+	a.cache.SetDefault("account-"+account.ID.String(), account)
+
+	if user.IsSuperAdmin || account.IsOwner(user.ID) || account.IsMember(user.ID) {
+		return sendJSON(w, http.StatusOK, account)
+	}
+	return notFoundError("Account not found")
+}
+
+type accountUpdateParams struct {
+	Name           string         `json:"name"`
+	BillingName    string         `json:"billing_name"`
+	BillingEmail   string         `json:"billing_email"`
+	BillingDetails string         `json:"billing_details"`
+	MetaData       models.JSONMap `json:"account_meta_data"`
+}
+
+// AccountsUpdate updates given account if proper permission
+func (a *API) AccountsUpdate(w http.ResponseWriter, r *http.Request) error {
+	var accountID uuid.UUID
+	var account *models.Account
+	var err error
+	accountID, err = uuid.FromString(chi.URLParam(r, "id"))
+	if err != nil {
+		return badRequestError("Invalid Account ID")
+	}
+
+	ctx := r.Context()
+	params := &accountUpdateParams{}
+	jsonDecoder := json.NewDecoder(r.Body)
+	err = jsonDecoder.Decode(params)
+	if err != nil {
+		return badRequestError("Could not read Account Update params: %v", err)
+	}
+
+	user := getUser(ctx)
+	if user == nil {
+		return internalServerError("Error finding user object")
+	}
+
+	// get the account,check permissions
+	// check account cache
+	var ok bool
+	fromCache, exists := a.cache.Get("account-" + accountID.String())
+	if exists {
+		if account, ok = fromCache.(*models.Account); !ok {
+			account, err = models.FindAccountByID(a.db, accountID)
+			if err != nil {
+				if models.IsNotFoundError(err) {
+					return notFoundError(err.Error())
+				}
+				return internalServerError("Database error finding account").WithInternalError(err)
+			}
+		}
+	} else {
+		account, err = models.FindAccountByID(a.db, accountID)
+		if err != nil {
+			if models.IsNotFoundError(err) {
+				return notFoundError(err.Error())
+			}
+			return internalServerError("Database error finding account").WithInternalError(err)
+		}
+	}
+	err = a.db.Transaction(func(tx *storage.Connection) error {
+		var terr error
+		// get permissions eg. hasPermission
+		if account.HasPermissionTo(tx, "account-edit") || account.IsOwner(user.ID) || user.IsSuperAdmin {
+			if params.Name != "" {
+				if terr = account.UpdateName(tx, params.Name); terr != nil {
+					return internalServerError("Error during name change").WithInternalError(terr)
+				}
+			}
+			if params.BillingName != "" {
+				if terr = account.UpdateBillingName(tx, params.BillingName); terr != nil {
+					return internalServerError("Error during billing name change").WithInternalError(terr)
+				}
+			}
+			if len(params.BillingEmail) > 254 || params.BillingEmail != "" {
+				if !emailRegex.MatchString(params.BillingEmail) {
+					return unprocessableEntityError("Email is Invalid")
+				}
+				// no further validation happens here
+				if terr = account.UpdateBillingEmail(tx, params.BillingEmail); terr != nil {
+					return internalServerError("Error during billing email change").WithInternalError(terr)
+				}
+			}
+			if params.BillingDetails != "" {
+				if terr = account.UpdateBillingDetails(tx, params.BillingDetails); terr != nil {
+					return internalServerError("Error during billing details change").WithInternalError(terr)
+				}
+			}
+			if params.MetaData != nil {
+				if !user.IsSuperAdmin {
+					return unauthorizedError("Updating account_meta_data requires admin privileges")
+				}
+				if terr = account.UpdateAccountMetaData(tx, params.MetaData); terr != nil {
+					return internalServerError("Error updating user").WithInternalError(terr)
+				}
+			}
+
+			// TODO: audit!
+			// we should remove the audit from identity and team
+			// and create a service by its own
+			return nil
+		}
+		return unauthorizedError("You dont have `account-edit` Permission, ask your Manager")
+	})
+
+	if err != nil {
+		return err
+	}
+
+	// cache it
+	a.cache.SetDefault("account-"+account.ID.String(), account)
+
 	return sendJSON(w, http.StatusOK, account)
 }

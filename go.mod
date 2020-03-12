@@ -12,6 +12,7 @@ require (
 	github.com/jackc/pgconn v1.4.0 // indirect
 	github.com/joho/godotenv v1.3.0
 	github.com/kelseyhightower/envconfig v1.4.0
+	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/rs/cors v1.7.0
 	github.com/sebest/xff v0.0.0-20160910043805-6c115e0ffa35

@@ -13,7 +13,7 @@ import (
 // maintains the relationship between a User and the Account
 type AccountUser struct {
 	ID          uuid.UUID  `json:"-" db:"id"`
-	AccountID   uuid.UUID  `json:"account_id" db:"account_id"`
+	AccountID   uuid.UUID  `json:"-" db:"account_id"`
 	UserID      uuid.UUID  `json:"user_id" db:"user_id"`
 	RoleID      uuid.UUID  `json:"role_id" db:"role_id"`
 	ConfirmedAt *time.Time `json:"confirmed_at,omitempty" db:"confirmed_at"`

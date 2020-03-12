@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/delivc/identity/models"
 	"github.com/delivc/team/storage"
 	"github.com/delivc/team/storage/namespace"
 	"github.com/gobuffalo/pop/v5"
@@ -31,8 +30,8 @@ type Account struct {
 	CreatedAt time.Time `json:"createdAt" db:"created_at"`
 	UpdatedAt time.Time `json:"updatedAt" db:"updated_at"`
 
-	Roles []Role        `json:"roles,omitempty" has_many:"roles"`
-	Users []models.User `json:"users,omitempty" many_to_many:"accounts_users"`
+	Roles       []Role        `json:"roles,omitempty" has_many:"roles"`
+	AccountUser []AccountUser `json:"users" has_many:"accounts_users"`
 }
 
 // TableName returns the given tablename of the model
@@ -46,6 +45,13 @@ func (Account) TableName() string {
 	return tableName
 }
 
+// BeforeSave is a hook that happens before the db update
+func (a *Account) BeforeSave(tx *pop.Connection) error {
+	now := time.Now()
+	a.UpdatedAt = now
+	return nil
+}
+
 // IsOwner checks if given uid is owner of account
 func (a *Account) IsOwner(userID uuid.UUID) bool {
 	for _, value := range a.OwnerIDs {
@@ -55,6 +61,87 @@ func (a *Account) IsOwner(userID uuid.UUID) bool {
 	}
 	return false
 
+}
+
+// IsMember iterates over AccountUser
+func (a *Account) IsMember(userID uuid.UUID) bool {
+	for _, value := range a.AccountUser {
+		if value.ID == userID {
+			return true
+		}
+	}
+
+	return false
+}
+
+// HasPermissionTo checks if given user is inside a role with request permission
+func (a *Account) HasPermissionTo(tx *storage.Connection, permission string) bool {
+	// get related roles with permissions
+	roles, err := FindRolesByAccount(tx, a.ID)
+	if err != nil {
+		return false
+	}
+
+	for _, role := range roles {
+		for _, rperm := range role.Permissions {
+			if rperm.Name == permission {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// UpdateName updates the name of the account
+func (a *Account) UpdateName(tx *storage.Connection, newName string) error {
+	if newName == "" {
+		return errors.New("Error: invalid name")
+	}
+	a.Name = newName
+	return tx.UpdateOnly(a, "name", "updated_at")
+}
+
+// UpdateBillingName updates the name of the account
+func (a *Account) UpdateBillingName(tx *storage.Connection, newName string) error {
+	if newName == "" {
+		return errors.New("Error: invalid name")
+	}
+	a.BillingName = newName
+	return tx.UpdateOnly(a, "billing_name", "updated_at")
+}
+
+// UpdateBillingDetails updates the name of the account
+func (a *Account) UpdateBillingDetails(tx *storage.Connection, newName string) error {
+	if newName == "" {
+		return errors.New("Error: invalid details")
+	}
+	a.BillingName = newName
+	return tx.UpdateOnly(a, "billing_details", "updated_at")
+}
+
+// UpdateBillingEmail updates the name of the account
+func (a *Account) UpdateBillingEmail(tx *storage.Connection, newName string) error {
+	if newName == "" {
+		return errors.New("Error: invalid E-Mail")
+	}
+	a.BillingEmail = newName
+	return tx.UpdateOnly(a, "billing_email", "updated_at")
+}
+
+// UpdateAccountMetaData updates all account meta data from a map of updates
+func (a *Account) UpdateAccountMetaData(tx *storage.Connection, updates map[string]interface{}) error {
+	if a.AccountMetaData == nil {
+		a.AccountMetaData = updates
+	} else if updates != nil {
+		for key, value := range updates {
+			if value != nil {
+				a.AccountMetaData[key] = value
+			} else {
+				delete(a.AccountMetaData, key)
+			}
+		}
+	}
+	return tx.UpdateOnly(a, "raw_account_meta_data")
 }
 
 // NewAccount initializes a new account from name
@@ -84,7 +171,7 @@ func DeleteAccount(tx *storage.Connection, accountID uuid.UUID) (bool, error) {
 
 func findAccount(tx *storage.Connection, query string, args ...interface{}) (*Account, error) {
 	obj := &Account{}
-	if err := tx.Q().Where(query, args...).First(obj); err != nil {
+	if err := tx.Q().Eager().Where(query, args...).First(obj); err != nil {
 		if errors.Cause(err) == sql.ErrNoRows {
 			return nil, AccountNotFoundError{}
 		}

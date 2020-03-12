@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/signal"
 	"regexp"
+	"runtime"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -13,12 +15,14 @@ import (
 	"github.com/delivc/team/storage"
 	"github.com/go-chi/chi/v4"
 	"github.com/gofrs/uuid"
+	gcache "github.com/patrickmn/go-cache"
 	"github.com/rs/cors"
 	"github.com/sebest/xff"
 	"github.com/sirupsen/logrus"
 )
 
 var bearerRegexp = regexp.MustCompile(`^(?:B|b)earer (\S+$)`)
+var emailRegex = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
 
 const (
 	audHeaderName  = "X-JWT-AUD"
@@ -28,14 +32,21 @@ const (
 // API is the main REST API
 type API struct {
 	handler http.Handler
+	cache   *gcache.Cache
 	db      *storage.Connection
 	config  *conf.GlobalConfiguration
 	version string
+	start   time.Time
 }
 
 // New creates a new API Instance
 func New(ctx context.Context, globalConfig *conf.GlobalConfiguration, db *storage.Connection, version string) *API {
-	api := &API{config: globalConfig, db: db, version: version}
+	api := &API{config: globalConfig, db: db, version: version, start: time.Now()}
+
+	// initialize new cache
+	// cached items are valid for 24hours
+	c := gcache.New(1440*time.Minute, 10*time.Minute)
+	api.cache = c
 
 	xffmw, _ := xff.Default()
 	logger := newStructuredLogger(logrus.StandardLogger())
@@ -53,6 +64,8 @@ func New(ctx context.Context, globalConfig *conf.GlobalConfiguration, db *storag
 
 		r.Get("/accounts", api.AccountsGet)
 		r.Post("/accounts", api.AccountCreate)
+		r.Get("/accounts/{id}", api.AccountGet)
+		r.Put("/accounts/{id}", api.AccountsUpdate)
 		r.Delete("/accounts/{id}", api.AccountDelete)
 	})
 
@@ -111,11 +124,28 @@ func WithInstanceConfig(ctx context.Context, config *conf.Configuration, instanc
 
 // HealthCheck returns a "is a live"
 func (a *API) HealthCheck(w http.ResponseWriter, r *http.Request) error {
+	// beside the healthcheck we are giving information about the memory usage
+	// idk where we are going to use this, but maybe in some kind of uptime checker
+	// to create some nice usage statistics?
+
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+
 	return sendJSON(w, http.StatusOK, map[string]string{
-		"version":     a.version,
-		"name":        "Team",
-		"description": "Team is a management Service for Delivc Teams",
+		"version":                a.version,
+		"name":                   "Team",
+		"description":            "Team is a management Service for Delivc Teams",
+		"alloc":                  strconv.FormatUint(bToMb(m.Alloc), 10) + " MiB",
+		"total_alloc":            strconv.FormatUint(bToMb(m.TotalAlloc), 10) + " MiB",
+		"sys":                    strconv.FormatUint(bToMb(m.Sys), 10) + " MiB",
+		"garbage_collector_runs": strconv.FormatUint(uint64(m.NumGC), 10),
+		"start_time":             a.start.String(),
+		"cached_items":           strconv.FormatInt(int64(a.cache.ItemCount()), 10),
 	})
+}
+
+func bToMb(b uint64) uint64 {
+	return b / 1024 / 1024
 }
 
 func (a *API) requestAud(ctx context.Context, r *http.Request) string {
