@@ -39,7 +39,7 @@ Team exposes the following endpoints:
             "id": "85bbbd1b-2a68-4241-9245-26ac7ab3f594",
             "name": "account-destroy"
         },
-        [...]
+        [...],
     }
   ```
 
