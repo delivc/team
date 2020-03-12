@@ -73,6 +73,17 @@ func AttachRole(tx *storage.Connection, accountID uuid.UUID, userID uuid.UUID, r
 	return nil
 }
 
+func findRole(tx *storage.Connection, query string, args ...interface{}) (*Role, error) {
+	obj := &Role{}
+	if err := tx.Q().Eager().Where(query, args...).First(obj); err != nil {
+		if errors.Cause(err) == sql.ErrNoRows {
+			return nil, RoleNotFoundError{}
+		}
+		return nil, errors.Wrap(err, "error finding role")
+	}
+	return obj, nil
+}
+
 func findRoles(tx *storage.Connection, query string, args ...interface{}) ([]*Role, error) {
 	obj := []*Role{}
 	if err := tx.Q().Eager().Where(query, args...).All(&obj); err != nil {
@@ -87,4 +98,9 @@ func findRoles(tx *storage.Connection, query string, args ...interface{}) ([]*Ro
 // FindRolesByAccount returns a list of roles by account or error
 func FindRolesByAccount(tx *storage.Connection, id uuid.UUID) ([]*Role, error) {
 	return findRoles(tx, "account_id = ?", id)
+}
+
+// FindRoleByAccountAndID returns roles by account and id
+func FindRoleByAccountAndID(tx *storage.Connection, accountID uuid.UUID, roleID uuid.UUID) (*Role, error) {
+	return findRole(tx, "account_id = ? and id = ?", accountID, roleID)
 }

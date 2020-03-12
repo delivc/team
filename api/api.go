@@ -67,6 +67,12 @@ func New(ctx context.Context, globalConfig *conf.GlobalConfiguration, db *storag
 		r.Get("/accounts/{id}", api.AccountGet)
 		r.Put("/accounts/{id}", api.AccountsUpdate)
 		r.Delete("/accounts/{id}", api.AccountDelete)
+
+		r.Route("/accounts/{id}/role", func(r *router) {
+			// nested routes for roles
+			r.Get("/", api.RoleGet)
+			r.Get("/{roleId}", api.RoleGet)
+		})
 	})
 
 	corsHandler := cors.New(cors.Options{
