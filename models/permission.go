@@ -54,3 +54,26 @@ func AllPermissions(tx *storage.Connection) (permissions []Permission, err error
 	}
 	return permissions, nil
 }
+
+// FindPermissions returns a list of Permissions if any
+func FindPermissions(tx *storage.Connection, pageParams *Pagination, sortParams *SortParams) ([]*Permission, error) {
+	permissions := []*Permission{}
+
+	q := tx.Q()
+
+	if sortParams != nil && len(sortParams.Fields) > 0 {
+		for _, field := range sortParams.Fields {
+			q = q.Order(field.Name + " " + string(field.Dir))
+		}
+	}
+
+	var err error
+	if pageParams != nil {
+		err = q.Paginate(int(pageParams.Page), int(pageParams.PerPage)).All(&permissions)
+		pageParams.Count = uint64(q.Paginator.TotalEntriesSize)
+	} else {
+		err = q.All(&permissions)
+	}
+
+	return permissions, err
+}

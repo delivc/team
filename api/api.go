@@ -68,6 +68,8 @@ func New(ctx context.Context, globalConfig *conf.GlobalConfiguration, db *storag
 		r.Put("/accounts/{id}", api.AccountsUpdate)
 		r.Delete("/accounts/{id}", api.AccountDelete)
 
+		r.Get("/permissions", api.PermissionsGet)
+
 		r.Route("/accounts/{id}/role", func(r *router) {
 			// nested routes for roles
 			r.Get("/", api.RoleGet)
