@@ -8,6 +8,7 @@ import (
 	"github.com/delivc/team/storage"
 	"github.com/go-chi/chi/v4"
 	"github.com/gofrs/uuid"
+	"github.com/sirupsen/logrus"
 )
 
 /**
@@ -129,7 +130,76 @@ func (a *API) RoleCreate(w http.ResponseWriter, r *http.Request) error {
 	return unauthorizedError("You dont have `account-role-create` Permission, ask your Manager")
 }
 
-// Update a Role
+type updateRoleRequest struct {
+	createRoleRequest
+}
+
+// RoleUpdate updates a role
+// Permission: account-role-update
+func (a *API) RoleUpdate(w http.ResponseWriter, r *http.Request) error {
+	ctx := r.Context()
+
+	params := &updateRoleRequest{}
+	jsonDecoder := json.NewDecoder(r.Body)
+	err := jsonDecoder.Decode(params)
+	if err != nil {
+		return badRequestError("Could not read Account Update params: %v", err)
+	}
+
+	account, err := a.getAccountFromRequest(r)
+	if err != nil {
+		return err
+	}
+
+	user := getUser(ctx)
+	if user == nil {
+		return badRequestError("Invalid User")
+	}
+
+	// get role from request
+	roleID, err := uuid.FromString(chi.URLParam(r, "roleId"))
+	if err != nil {
+		return badRequestError("Invalid Role ID")
+	}
+	logrus.Info(roleID)
+
+	// get role from cache or get a new from db
+	var role *models.Role
+	roleFromCache, exists := a.cache.Get("role-" + roleID.String())
+	if exists {
+		role = roleFromCache.(*models.Role)
+	} else {
+		if role, err = models.FindRoleByAccountAndID(a.db, account.ID, roleID); err != nil {
+			return internalServerError("Database error finding roles").WithInternalError(err)
+		}
+	}
+
+	if user.IsSuperAdmin || account.IsOwner(user.ID) || account.HasPermissionTo(a.db, "account-role-update", user.ID) {
+		// we have permission, now do the updates :)))
+
+		err = a.db.Transaction(func(conn *storage.Connection) error {
+			var terr error
+			if params.Name != "" {
+				if terr = role.UpdateName(conn, params.Name); terr != nil {
+					return internalServerError("Error during name change").WithInternalError(terr)
+				}
+			}
+			if params.Permissions != nil {
+				if terr = role.UpdatePermissions(conn, params.Permissions); terr != nil {
+					return internalServerError("Error updating permissions").WithInternalError(terr)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		a.cache.SetDefault("role-"+role.ID.String(), role)
+		return sendJSON(w, 200, role)
+	}
+
+	return unauthorizedError("You dont have `account-role-update` Permission, ask your Manager")
+}
 
 // RoleDestroy destroys a role in storage
 // Permission: account-role-destroy
@@ -160,6 +230,9 @@ func (a *API) RoleDestroy(w http.ResponseWriter, r *http.Request) error {
 		if err != nil {
 			return err
 		}
+
+		// remove from cache if exists
+		a.cache.Delete("role-" + roleID.String())
 
 		return sendJSON(w, http.StatusOK, map[string]interface{}{})
 	}

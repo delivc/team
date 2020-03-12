@@ -23,8 +23,8 @@ type Role struct {
 // RolePermission relationship between roles and permissions
 type RolePermission struct {
 	ID           uuid.UUID `json:"id" db:"id"`
-	RoleID       uuid.UUID
-	PermissionID uuid.UUID
+	RoleID       uuid.UUID `db:"role_id"`
+	PermissionID uuid.UUID `db:"permission_id"`
 	CreatedAt    time.Time `json:"createdAt" db:"created_at"`
 	UpdatedAt    time.Time `json:"updatedAt" db:"updated_at"`
 }
@@ -49,6 +49,63 @@ func (Role) TableName() string {
 	}
 
 	return tableName
+}
+
+// UpdateName updates the name of the role
+func (r *Role) UpdateName(tx *storage.Connection, newName string) error {
+	if newName == "" {
+		return errors.New("Error: invalid name")
+	}
+	r.Name = newName
+	return tx.UpdateOnly(r, "name", "updated_at")
+}
+
+// UpdatePermissions syncs given permissions of role
+func (r *Role) UpdatePermissions(tx *storage.Connection, perms []string) error {
+	if perms == nil {
+		return errors.New("Error: invalid Permissions")
+	}
+	var err error
+	var permissions []Permission
+
+	if permissions, err = FindPermissionsByName(tx, perms); err != nil {
+		return errors.Wrap(err, "Error finding Permissions")
+	}
+
+	if err = detachAllPermissions(tx, r.ID); err != nil {
+		return err
+	}
+
+	for _, permission := range permissions {
+		if err = attachPermission(tx, r.ID, permission.ID); err != nil {
+			return err
+		}
+	}
+	r.Permissions = permissions
+
+	return nil
+}
+
+func attachPermission(tx *storage.Connection, roleID uuid.UUID, permissionID uuid.UUID) error {
+	id, err := uuid.NewV4()
+	if err != nil {
+		return errors.Wrap(err, "Error generating unique id")
+	}
+	p := RolePermission{
+		ID:           id,
+		RoleID:       roleID,
+		PermissionID: permissionID,
+	}
+	return tx.Create(&p)
+}
+
+func detachAllPermissions(tx *storage.Connection, roleID uuid.UUID) error {
+	tableName := RolePermission{}.TableName()
+
+	if err := tx.RawQuery("DELETE FROM "+tableName+" WHERE role_id = ?", roleID).Exec(); err != nil {
+		return err
+	}
+	return nil
 }
 
 // NewRole creates a new Role

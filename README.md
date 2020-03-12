@@ -286,6 +286,39 @@ Team exposes the following endpoints:
     }
     ```
 
+* **PUT /accounts/{id}/role/{roleId}**
+  
+  Updates Role with Permissions
+  User MUST be SuperAdmin or Owner or have `account-role-create` permission of given Account
+
+  Accepts:
+  ```json
+    {
+	    "name": "newRoleName123",
+	    "permissions": ["account-role-update", "account-role-destroy"]
+    }
+  ```
+
+  Returns
+  ```json
+    {
+        "id": "f76912cf-a5e2-4faa-a80e-763250194620",
+        "name": "newRoleName123",
+        "createdAt": "2020-03-12T07:57:52Z",
+        "updatedAt": "2020-03-12T10:55:42.427786+01:00",
+        "permissions": [
+            {
+                "id": "ddd4bb5e-0b82-45e3-ba00-a8f8de459e3b",
+                "name": "account-role-destroy"
+            },
+            {
+                "id": "f61528a1-7396-4a6d-ae03-5d0d7153cb63",
+                "name": "account-role-update"
+            }
+        ]
+    }
+  ```
+
 * **DELETE /accounts/{id}/role/{roleId}**
   
   Delete given Account.
