@@ -74,6 +74,7 @@ func New(ctx context.Context, globalConfig *conf.GlobalConfiguration, db *storag
 			// nested routes for roles
 			r.Get("/", api.RoleGet)
 			r.Get("/{roleId}", api.RoleGet)
+			r.Post("/", api.RoleCreate)
 		})
 	})
 

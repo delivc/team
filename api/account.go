@@ -279,7 +279,7 @@ func (a *API) AccountsUpdate(w http.ResponseWriter, r *http.Request) error {
 	err = a.db.Transaction(func(tx *storage.Connection) error {
 		var terr error
 		// get permissions eg. hasPermission
-		if account.HasPermissionTo(tx, "account-edit") || account.IsOwner(user.ID) || user.IsSuperAdmin {
+		if account.HasPermissionTo(tx, "account-edit", user.ID) || account.IsOwner(user.ID) || user.IsSuperAdmin {
 			if params.Name != "" {
 				if terr = account.UpdateName(tx, params.Name); terr != nil {
 					return internalServerError("Error during name change").WithInternalError(terr)

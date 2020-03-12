@@ -9,6 +9,13 @@ func IsNotFoundError(err error) bool {
 	return false
 }
 
+// PermissionNotFoundError represents when a user is not found.
+type PermissionNotFoundError struct{}
+
+func (e PermissionNotFoundError) Error() string {
+	return "Permission not found"
+}
+
 // AccountNotFoundError represents when a user is not found.
 type AccountNotFoundError struct{}
 

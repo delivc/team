@@ -7,6 +7,8 @@ import (
 	"net/http"
 
 	"github.com/delivc/team/conf"
+	"github.com/delivc/team/models"
+	"github.com/go-chi/chi/v4"
 	"github.com/gofrs/uuid"
 	"github.com/pkg/errors"
 )
@@ -40,4 +42,40 @@ func sendJSON(w http.ResponseWriter, status int, obj interface{}) error {
 	w.WriteHeader(status)
 	_, err = w.Write(b)
 	return err
+}
+
+func (a *API) getAccountFromRequest(r *http.Request) (*models.Account, error) {
+	var accountID uuid.UUID
+	var err error
+	var account *models.Account
+
+	accountID, err = uuid.FromString(chi.URLParam(r, "id"))
+	if err != nil {
+		return account, badRequestError("Invalid Account ID")
+	}
+
+	fromCache, exists := a.cache.Get("account-" + accountID.String())
+	if exists {
+		var ok bool
+		account, ok := fromCache.(*models.Account)
+		if !ok {
+			account, err = models.FindAccountByID(a.db, accountID)
+			if err != nil {
+				if models.IsNotFoundError(err) {
+					return account, notFoundError(err.Error())
+				}
+				return account, internalServerError("Database error finding account").WithInternalError(err)
+			}
+		}
+	} else {
+		account, err = models.FindAccountByID(a.db, accountID)
+		if err != nil {
+			if models.IsNotFoundError(err) {
+				return account, notFoundError(err.Error())
+			}
+			return account, internalServerError("Database error finding account").WithInternalError(err)
+		}
+	}
+
+	return account, nil
 }

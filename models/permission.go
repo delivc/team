@@ -1,12 +1,14 @@
 package models
 
 import (
+	"database/sql"
 	"time"
 
 	"github.com/delivc/team/storage"
 	"github.com/delivc/team/storage/namespace"
 	"github.com/gofrs/uuid"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 // Permission exports `Id` and `Match`
@@ -52,6 +54,30 @@ func AllPermissions(tx *storage.Connection) (permissions []Permission, err error
 	if err != nil {
 		return nil, errors.Wrap(err, "error finding permissions")
 	}
+	return permissions, nil
+}
+
+// FindPermissionsByName returns permissions
+func FindPermissionsByName(tx *storage.Connection, request []string) ([]Permission, error) {
+	permissions := []Permission{}
+	if len(request) == 0 {
+		return permissions, errors.New("No Permissions")
+	}
+	q := tx.Q()
+
+	q.Where("name IN (?)", request)
+
+	if err := q.All(&permissions); err != nil {
+		if errors.Cause(err) == sql.ErrNoRows {
+			return nil, PermissionNotFoundError{}
+		}
+		return permissions, errors.Wrap(err, "error finding permissions")
+	}
+
+	logrus.Info(permissions)
+
+	//
+
 	return permissions, nil
 }
 

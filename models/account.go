@@ -75,17 +75,24 @@ func (a *Account) IsMember(userID uuid.UUID) bool {
 }
 
 // HasPermissionTo checks if given user is inside a role with request permission
-func (a *Account) HasPermissionTo(tx *storage.Connection, permission string) bool {
+func (a *Account) HasPermissionTo(tx *storage.Connection, permission string, userID uuid.UUID) bool {
 	// get related roles with permissions
 	roles, err := FindRolesByAccount(tx, a.ID)
 	if err != nil {
 		return false
 	}
 
-	for _, role := range roles {
-		for _, rperm := range role.Permissions {
-			if rperm.Name == permission {
-				return true
+	for _, user := range a.AccountUser {
+		if user.UserID == userID {
+			for _, role := range roles {
+				if user.RoleID == role.ID {
+					for _, rperm := range role.Permissions {
+						if rperm.Name == permission {
+							return true
+						}
+					}
+				}
+
 			}
 		}
 	}

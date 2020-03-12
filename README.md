@@ -447,3 +447,34 @@ Team exposes the following endpoints:
         ]
     }
   ```
+
+* **POST /accounts/{id}/role**
+
+  Creates a new Role, with Permissions if defined
+  Accepts:
+  ```json
+    {
+	    "name": "MyNewRole",
+	    "permissions": ["account-edit", "does-not-exists", "account-destroy"]
+    }
+  ```
+
+  Returns:
+  ```json
+    {
+        "id": "97a2588b-69ea-4006-b7f4-d0d6d84870e8",
+        "name": "MyNewRole",
+        "createdAt": "2020-03-12T08:59:36.141506+01:00",
+        "updatedAt": "2020-03-12T08:59:36.141509+01:00",
+        "permissions": [
+            {
+                "id": "85bbbd1b-2a68-4241-9245-26ac7ab3f594",
+                "name": "account-destroy"
+            },
+            {
+                "id": "904841b0-802f-4dff-ba24-416b4363f7b9",
+                "name": "account-edit"
+            }
+        ]
+    }
+    ```
