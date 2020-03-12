@@ -79,12 +79,6 @@ type createRoleRequest struct {
 // RoleCreate create a new role with permissions if given
 func (a *API) RoleCreate(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
-	// get account id from url
-	// read params
-	// bind params to new role object
-	// why not bind directly to role object?
-	// user could specifiy an ID from an other account
-	// why not override id from request? yep...
 
 	account, err := a.getAccountFromRequest(r)
 	if err != nil {
@@ -96,9 +90,6 @@ func (a *API) RoleCreate(w http.ResponseWriter, r *http.Request) error {
 		return badRequestError("Invalid User")
 	}
 	if user.IsSuperAdmin || account.IsOwner(user.ID) || account.HasPermissionTo(a.db, "account-role-create", user.ID) {
-		// we have a user
-		// we have permission
-		// we know the account where we create the new role
 		params := &createRoleRequest{}
 		jsonDecoder := json.NewDecoder(r.Body)
 		err = jsonDecoder.Decode(params)
@@ -135,13 +126,46 @@ func (a *API) RoleCreate(w http.ResponseWriter, r *http.Request) error {
 		return sendJSON(w, 200, role)
 
 	}
-	// get account from cache or db
 	return unauthorizedError("You dont have `account-role-create` Permission, ask your Manager")
 }
 
 // Update a Role
 
-// Destroy a Role
+// RoleDestroy destroys a role in storage
+// Permission: account-role-destroy
+func (a *API) RoleDestroy(w http.ResponseWriter, r *http.Request) error {
+	ctx := r.Context()
+
+	account, err := a.getAccountFromRequest(r)
+	if err != nil {
+		return err
+	}
+
+	user := getUser(ctx)
+	if user == nil {
+		return badRequestError("Invalid User")
+	}
+
+	// get role from request
+	roleID, err := uuid.FromString(chi.URLParam(r, "roleId"))
+	if err != nil {
+		return badRequestError("Invalid Role ID")
+	}
+
+	if user.IsSuperAdmin || account.IsOwner(user.ID) || account.HasPermissionTo(a.db, "account-role-destroy", user.ID) {
+		err = a.db.Transaction(func(conn *storage.Connection) error {
+			return models.DeleteRole(conn, roleID)
+		})
+
+		if err != nil {
+			return err
+		}
+
+		return sendJSON(w, http.StatusOK, map[string]interface{}{})
+	}
+
+	return unauthorizedError("You dont have `account-role-destroy` Permission, ask your Manager")
+}
 
 // detachPermissions
 // detachaches all Permissions of given Role

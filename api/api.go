@@ -75,6 +75,7 @@ func New(ctx context.Context, globalConfig *conf.GlobalConfiguration, db *storag
 			r.Get("/", api.RoleGet)
 			r.Get("/{roleId}", api.RoleGet)
 			r.Post("/", api.RoleCreate)
+			r.Delete("/{roleId}", api.RoleDestroy)
 		})
 	})
 

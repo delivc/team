@@ -285,3 +285,13 @@ Team exposes the following endpoints:
         ]
     }
     ```
+
+* **DELETE /accounts/{id}/role/{roleId}**
+  
+  Delete given Account.
+  User MUST be SuperAdmin or Owner or have account-role-destroy permission of given Account
+
+  Returns
+  ```json
+  {}
+  ```

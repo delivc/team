@@ -104,3 +104,8 @@ func FindRolesByAccount(tx *storage.Connection, id uuid.UUID) ([]*Role, error) {
 func FindRoleByAccountAndID(tx *storage.Connection, accountID uuid.UUID, roleID uuid.UUID) (*Role, error) {
 	return findRole(tx, "account_id = ? and id = ?", accountID, roleID)
 }
+
+// DeleteRole destroys a role in storage
+func DeleteRole(tx *storage.Connection, roleID uuid.UUID) error {
+	return tx.Destroy(&Role{ID: roleID})
+}

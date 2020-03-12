@@ -108,6 +108,7 @@ func migrate(cmd *cobra.Command, args []string) {
 		"account-users-remove",
 		"account-role-create",
 		"account-role-update",
+		"account-role-destroy",
 	}
 
 	err = db.Transaction(func(tx *pop.Connection) error {
